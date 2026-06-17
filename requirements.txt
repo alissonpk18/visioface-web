@@ -1,0 +1,5 @@
+opencv-python
+pillow
+numpy
+face_recognition
+dlib-bin

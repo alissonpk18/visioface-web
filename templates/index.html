@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face.ID Premium Web</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #121212; color: #f8f9fa; }
+        .card { background-color: #1e1e1e; border: none; }
+        .camera-box { background-color: #000; border-radius: 10px; overflow: hidden; display: flex; justify-content: center; align-items: center; min-height: 480px; }
+        .camera-feed { max-width: 100%; height: auto; }
+        .stat-box { background-color: #2c2c2c; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
+        .history-table-wrap { max-height: 240px; overflow-y: auto; border-radius: 8px; border: 1px solid #2d2d2d; }
+        .history-table-wrap table { margin-bottom: 0; }
+        .history-table-wrap thead th { position: sticky; top: 0; background-color: #212529; z-index: 2; }
+        .stat-title { color: #ffffff; }
+        .stat-value { color: #ffffff; }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h2 class="text-center mb-4"><i class="bi bi-person-bounding-box text-primary"></i> Face.ID Premium Web</h2>
+        <p class="text-center text-white-50 mt-n3 mb-4">Criado por Alisson</p>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <div class="camera-box">
+                            <img src="/video_feed" class="camera-feed" alt="Camera Feed Inativo">
+                        </div>
+                    </div>
+                </div>
+                <div class="card shadow mt-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="m-0 text-info"><i class="bi bi-clock-history"></i> Historico de Vistos</h5>
+                            <small class="text-muted">Atualiza a cada 5s</small>
+                        </div>
+                        <div class="history-table-wrap">
+                            <table class="table table-dark table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Quando</th>
+                                        <th>Camera</th>
+                                        <th>Dist.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history_rows">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-3">Sem registros confirmados ainda.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow h-100">
+                    <div class="card-body d-flex flex-column">
+                        <h4 class="card-title text-center text-primary mb-4">Painel de Controle</h4>
+
+                        <div class="alert alert-info small py-2">
+                            Depois do primeiro cadastro, o reconhecimento fica automatico no video principal.
+                        </div>
+                        <div id="collect_help" class="alert alert-secondary small py-2 mb-3">
+                            Coleta correta: mantenha boa iluminacao, um rosto por vez e fique centralizado na camera.
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="nameInput" class="form-label text-muted small">Nome para Cadastro</label>
+                            <input type="text" id="nameInput" class="form-control bg-dark text-white border-secondary" placeholder="Ex: Joao da Silva">
+                        </div>
+
+                        <button class="btn btn-primary w-100 mb-3 py-2 fw-bold" onclick="register()">
+                            <i class="bi bi-person-plus-fill"></i> Cadastrar Multiplas Amostras
+                        </button>
+
+                        <a class="btn btn-outline-light w-100 mb-3" href="/cadastros">
+                            <i class="bi bi-people-fill"></i> Gerenciar Cadastros
+                        </a>
+
+                        <button class="btn btn-outline-info w-100 mb-3" onclick="openSettings()">
+                            <i class="bi bi-sliders"></i> Configuracoes
+                        </button>
+
+                        <button class="btn btn-outline-warning w-100 mb-3" onclick="clearHistory()">
+                            <i class="bi bi-trash3"></i> Apagar Historico de Vistos
+                        </button>
+
+                        <button class="btn btn-outline-danger w-100 mb-4" onclick="cancel()">
+                            <i class="bi bi-x-circle"></i> Interromper Acao Atual
+                        </button>
+
+                        <hr class="border-secondary">
+
+                        <div class="stat-box">
+                            <span class="stat-title small d-block mb-1">Status do Sistema:</span>
+                            <span id="status_text" class="badge bg-secondary fs-6 w-100 py-2">Inicializando...</span>
+                        </div>
+
+                        <div class="stat-box">
+                            <span class="stat-title small d-block mb-1">Ultimo Resultado:</span>
+                            <span id="last_name" class="fw-bold stat-value fs-5">-</span>
+                        </div>
+
+                        <div class="row g-2 mt-auto">
+                            <div class="col-4">
+                                <div class="stat-box text-center">
+                                    <span class="stat-title small d-block">Usuarios</span>
+                                    <h3 id="users_count" class="m-0 stat-value">0</h3>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-box text-center">
+                                    <span class="stat-title small d-block">Amostras</span>
+                                    <h3 id="samples_count" class="m-0 stat-value">0</h3>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-box text-center">
+                                    <span class="stat-title small d-block">Fotos Ref.</span>
+                                    <h3 id="references_count" class="m-0 stat-value">0</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-white border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-sliders"></i> Configuracoes do Sistema</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="confidenceInput" class="form-label">Taxa de Confiabilidade (0.05 a 0.99)</label>
+                        <input id="confidenceInput" type="number" step="0.001" min="0.05" max="0.99" class="form-control bg-black text-white border-secondary">
+                    </div>
+                    <div class="mb-3">
+                        <label for="samplesNeededInput" class="form-label">Quantidade de Amostras por Cadastro (2 a 20)</label>
+                        <input id="samplesNeededInput" type="number" step="1" min="2" max="20" class="form-control bg-black text-white border-secondary">
+                    </div>
+                    <div class="mb-1">
+                        <label for="maxRefsInput" class="form-label">Maximo de Fotos Ref. por Pessoa (1 a 60)</label>
+                        <input id="maxRefsInput" type="number" step="1" min="1" max="60" class="form-control bg-black text-white border-secondary">
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSettings()">Salvar Configuracoes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let settingsModalInstance = null;
+
+        function normalizeText(text) {
+            return (text || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase();
+        }
+
+        function escapeHtml(text) {
+            return String(text || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) {
+                return "-";
+            }
+            const parsed = new Date(timestamp);
+            if (Number.isNaN(parsed.getTime())) {
+                return timestamp;
+            }
+            return parsed.toLocaleString("pt-BR");
+        }
+
+        function updateUI() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusText = data.status_text || "";
+                    const normalized = normalizeText(statusText);
+                    const statusBadge = document.getElementById('status_text');
+
+                    statusBadge.innerText = statusText;
+                    statusBadge.className = "badge fs-6 w-100 py-2";
+
+                    if (normalized.includes("carregando") || normalized.includes("analisando") || normalized.includes("coletando") || normalized.includes("ambigu")) {
+                        statusBadge.classList.add("bg-warning", "text-dark");
+                    } else if (normalized.includes("identificado") || normalized.includes("concluido") || normalized.includes("permitido")) {
+                        statusBadge.classList.add("bg-success");
+                    } else if (normalized.includes("nao identificado") || normalized.includes("desconhecido") || normalized.includes("negado") || normalized.includes("problema") || normalized.includes("erro")) {
+                        statusBadge.classList.add("bg-danger");
+                    } else {
+                        statusBadge.classList.add("bg-secondary");
+                    }
+
+                    const hasName = data.last_name && data.last_name !== "-";
+                    const hasScore = data.last_distance && data.last_distance !== "-";
+                    const lastLabel = hasName
+                        ? (hasScore ? `${data.last_name} (Score ${data.last_distance})` : data.last_name)
+                        : "-";
+
+                    document.getElementById('last_name').innerText = lastLabel;
+                    document.getElementById('users_count').innerText = data.users_count ?? "0";
+                    document.getElementById('samples_count').innerText = data.samples_count ?? "0";
+                    document.getElementById('references_count').innerText = data.references_count ?? "0";
+
+                    const helpEl = document.getElementById('collect_help');
+                    helpEl.innerText = data.collect_instructions || "Coleta correta: mantenha boa iluminacao, um rosto por vez e fique centralizado na camera.";
+                    helpEl.className = data.is_collecting
+                        ? "alert alert-success small py-2 mb-3"
+                        : "alert alert-secondary small py-2 mb-3";
+                })
+                .catch(err => console.error(err));
+        }
+
+        function updateHistory() {
+            fetch('/api/history?limit=20')
+                .then(response => response.json())
+                .then(data => {
+                    const rowsEl = document.getElementById('history_rows');
+                    const items = Array.isArray(data.items) ? data.items : [];
+                    if (!items.length) {
+                        rowsEl.innerHTML = `
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">Sem registros confirmados ainda.</td>
+                            </tr>
+                        `;
+                        return;
+                    }
+
+                    const rowsHtml = items.map(item => {
+                        const name = escapeHtml(item.person_name || "-");
+                        const when = escapeHtml(formatTimestamp(item.timestamp));
+                        const camera = escapeHtml(item.camera_id || "-");
+                        const distance = (item.distance !== null && item.distance !== undefined)
+                            ? Number(item.distance).toFixed(4)
+                            : "-";
+                        return `
+                            <tr>
+                                <td class="text-success fw-semibold">${name}</td>
+                                <td>${when}</td>
+                                <td>${camera}</td>
+                                <td>${distance}</td>
+                            </tr>
+                        `;
+                    }).join("");
+
+                    rowsEl.innerHTML = rowsHtml;
+                })
+                .catch(() => {
+                });
+        }
+
+        function openSettings() {
+            fetch('/api/settings')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('confidenceInput').value = Number(data.confirmed_score_threshold ?? 0.199).toFixed(3);
+                    document.getElementById('samplesNeededInput').value = Number(data.samples_needed ?? 5);
+                    document.getElementById('maxRefsInput').value = Number(data.max_reference_photos_per_person ?? 15);
+                    if (!settingsModalInstance) {
+                        settingsModalInstance = new bootstrap.Modal(document.getElementById('settingsModal'));
+                    }
+                    settingsModalInstance.show();
+                })
+                .catch(() => {
+                    alert("Nao foi possivel carregar as configuracoes.");
+                });
+        }
+
+        function saveSettings() {
+            const payload = {
+                confirmed_score_threshold: parseFloat(document.getElementById('confidenceInput').value),
+                samples_needed: parseInt(document.getElementById('samplesNeededInput').value, 10),
+                max_reference_photos_per_person: parseInt(document.getElementById('maxRefsInput').value, 10)
+            };
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error("Falha ao salvar configuracoes.");
+                    }
+                    if (settingsModalInstance) {
+                        settingsModalInstance.hide();
+                    }
+                    updateUI();
+                    alert("Configuracoes salvas com sucesso.");
+                })
+                .catch(() => {
+                    alert("Nao foi possivel salvar as configuracoes.");
+                });
+        }
+
+        function clearHistory() {
+            if (!confirm("Deseja apagar o historico de vistos agora?")) {
+                return;
+            }
+            fetch('/api/history/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    updateHistory();
+                    alert(`Historico apagado. Registros removidos: ${data.removed ?? 0}`);
+                })
+                .catch(() => {
+                    alert("Nao foi possivel apagar o historico.");
+                });
+        }
+
+        updateUI();
+        updateHistory();
+        setInterval(updateUI, 500);
+        setInterval(updateHistory, 5000);
+
+        function register() {
+            const nameInput = document.getElementById('nameInput');
+            const name = nameInput.value.trim();
+            if (!name) {
+                alert("Por favor, digite o nome de quem sera cadastrado.");
+                nameInput.focus();
+                return;
+            }
+            fetch('/api/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'register', name: name })
+            });
+            nameInput.value = "";
+        }
+
+        function cancel() {
+            fetch('/api/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'cancel' })
+            });
+        }
+    </script>
+</body>
+</html>

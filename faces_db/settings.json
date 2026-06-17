@@ -1,0 +1,5 @@
+{
+  "confirmed_score_threshold": 0.199,
+  "samples_needed": 11,
+  "max_reference_photos_per_person": 15
+}
