@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Ambiente virtual
+venv/
+.venv/
+env/
+.env/
+
+# Executáveis e artefatos de build
+*.exe
+*.pkg
+*.spec.tmp
+dist/
+
+# Wheel files (dependências devem ser instaladas via pip, não commitadas)
+*.whl
+
+# Logs de runtime
+error.log
+*.log
+
+# Dados de histórico em tempo real (gerado pelo app)
+capture_history.jsonl
+
+# IDE e sistema operacional
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
