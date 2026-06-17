@@ -1,86 +1,147 @@
-# VisioFace Web
+# 🎭 VisioFace Web — Face.ID Premium
 
-Sistema de reconhecimento facial em tempo real com interface web, construído com Python, Flask e OpenCV.
+Sistema de **reconhecimento facial em tempo real** com interface web, construído em Python com Flask, OpenCV e a biblioteca `face_recognition`.
 
-## Pré-requisitos
+A aplicação liga a câmera, detecta os rostos ao vivo, compara com uma base de pessoas cadastradas e exibe na tela quem foi identificado — tudo acessível pelo navegador.
 
-- Python 3.9+
-- Câmera conectada ao servidor
-- Sistema operacional: Windows ou Linux
+---
 
-## Instalação
+## ✨ Funcionalidades
+
+- 📹 **Vídeo ao vivo** no navegador (stream MJPEG) com overlay desenhado sobre cada rosto
+- 👤 **Cadastro guiado de pessoas** com coleta de múltiplas amostras (5 a 20) em ângulos diferentes
+- 🔍 **Reconhecimento em tempo real** com indicação visual por cores:
+  - 🟢 Verde — identificado com confiança
+  - 🟡 Amarelo — em análise / incerto
+  - 🔴 Vermelho — desconhecido ou erro
+- 👥 **Múltiplos rostos** detectados e classificados simultaneamente
+- 🎯 **Zona de foco central** para desempatar rostos parecidos (ambiguidade)
+- 🕓 **Histórico de detecções** com deduplicação e intervalo mínimo entre avistamentos
+- 🖼️ **Fotos de referência** das pessoas cadastradas armazenadas em SQLite
+- ⚙️ **Configurações ajustáveis** via interface (limiar de confiança, nº de amostras, fotos de referência)
+
+---
+
+## 🧰 Pré-requisitos
+
+- **Python 3.9+**
+- Uma **câmera** (webcam) conectada ao servidor
+- **Windows** ou **Linux**
+
+> ℹ️ A biblioteca `face_recognition` depende do `dlib`. Este projeto usa `dlib-bin` (binário pré-compilado) para evitar a necessidade de compilar do zero.
+
+---
+
+## 🚀 Instalação
 
 ```bash
 # 1. Clone o repositório
-git clone <url-do-repositorio>
+git clone https://github.com/alissonpk18/visioface-web.git
 cd visioface-web
 
-# 2. Crie um ambiente virtual (recomendado)
+# 2. Crie e ative um ambiente virtual (recomendado)
 python -m venv venv
-venv\Scripts\activate      # Windows
-source venv/bin/activate   # Linux/macOS
+# Windows:
+venv\Scripts\activate
+# Linux/macOS:
+source venv/bin/activate
 
 # 3. Instale as dependências
 pip install -r requirements.txt
 ```
 
-## Executando
+---
+
+## ▶️ Como usar
 
 ```bash
 python app.py
 ```
 
-Acesse no navegador: **http://localhost:5000**
+Abra o navegador em **http://localhost:5000**
 
-## Estrutura do Projeto
+### Fluxo básico
+
+1. **Cadastrar uma pessoa**
+   - Acesse a página de cadastros (`/cadastros`)
+   - Digite o nome e inicie a coleta
+   - Fique **sozinho na câmera**, com o rosto centralizado no quadrado verde
+   - Mude levemente o ângulo da cabeça a cada amostra até completar a coleta
+
+2. **Reconhecer**
+   - Na tela principal, qualquer rosto cadastrado é identificado automaticamente ao vivo
+   - O nome e o nível de confiança aparecem sobre o rosto
+
+3. **Gerenciar**
+   - Veja a lista de cadastros, remova pessoas e limpe o histórico pela interface
+
+---
+
+## 📂 Estrutura do projeto
 
 ```
 visioface-web/
-├── app.py                   # Aplicação principal (Flask + reconhecimento facial)
-├── pkg_resources.py         # Compatibilidade para face_recognition_models
-├── requirements.txt         # Dependências Python
-├── app.spec                 # Configuração PyInstaller (build de executável)
-├── faces_db/                # Banco de dados de rostos
-│   ├── encodings.npy        # Encodings faciais (NumPy)
-│   ├── nomes.json           # Nomes associados aos encodings
-│   ├── references.sqlite3   # Fotos de referência
-│   └── settings.json        # Configurações do sistema
-├── templates/               # Templates HTML
-│   ├── index.html           # Dashboard principal
-│   └── cadastros.html       # Gerenciamento de cadastros
+├── app.py                       # Aplicação principal (Flask + lógica de reconhecimento)
+├── pkg_resources.py             # Compatibilidade para face_recognition_models
+├── requirements.txt             # Dependências Python
+├── app.spec                     # Configuração PyInstaller (build do executável)
+├── README.md                    # Este arquivo
+├── .gitignore
+├── faces_db/                    # Banco de dados local (gerado/atualizado pelo app)
+│   ├── encodings.npy            # Vetores faciais (128 dimensões por amostra)
+│   ├── nomes.json               # Nomes associados a cada encoding
+│   ├── references.sqlite3       # Metadados das fotos de referência
+│   ├── reference_images/        # Fotos de referência por pessoa
+│   └── settings.json            # Configurações do sistema
+├── templates/                  # Interface web
+│   ├── index.html               # Dashboard principal (vídeo ao vivo)
+│   └── cadastros.html           # Gerenciamento de cadastros
 └── scripts/
-    └── servidor_keep_alive.bat  # Script Windows para reinício automático
+    └── servidor_keep_alive.bat  # Watchdog Windows (reinício automático)
 ```
 
-## Rotas da API
+---
+
+## 🧩 Arquitetura interna (`app.py`)
+
+O código é organizado em componentes com responsabilidades únicas:
+
+| Componente | Responsabilidade |
+|------------|------------------|
+| `CameraWorker` | Captura de frames da webcam em thread dedicada |
+| `FaceRepository` | Armazena/carrega os encodings faciais e os nomes |
+| `ReferenceImageStore` | Guarda as fotos de referência (SQLite + arquivos) |
+| `HistoryRepository` | Registra o histórico de avistamentos (JSONL) com deduplicação |
+| `SettingsRepository` | Persiste as configurações em `settings.json` |
+| `WebTracker` | Orquestra a captura, detecção, classificação e desenho do overlay |
+| `Flask` | Servidor web que serve a interface e a API |
+
+**Fluxo resumido:**
+`frame da câmera → detecção/encoding → classificação (multi-face, ambiguidade, zona de foco, histórico) → overlay OpenCV + APIs Flask`
+
+---
+
+## 🔌 Rotas da API
 
 | Rota | Método | Descrição |
 |------|--------|-----------|
 | `/` | GET | Dashboard principal |
-| `/cadastros` | GET | Página de gerenciamento |
-| `/video_feed` | GET | Stream MJPEG da câmera |
-| `/api/status` | GET | Status atual da detecção |
-| `/api/settings` | GET/POST | Configurações do sistema |
-| `/api/history` | GET | Histórico de detecções |
-| `/api/history/clear` | POST | Limpar histórico |
-| `/api/registrations` | GET | Lista de cadastros |
-| `/api/registration/delete` | POST | Remover cadastro |
-| `/api/registration/clear` | POST | Limpar todos os cadastros |
+| `/cadastros` | GET | Página de gerenciamento de cadastros |
+| `/video_feed` | GET | Stream MJPEG da câmera com overlay |
+| `/api/status` | GET | Status atual da detecção (nome, distância, contadores) |
+| `/api/settings` | GET / POST | Ler ou atualizar as configurações |
+| `/api/history` | GET | Histórico de detecções (param. `limit`, 1–200) |
+| `/api/history/clear` | POST | Limpar o histórico |
+| `/api/registrations` | GET | Lista de cadastros e contagem de amostras |
+| `/api/registration/delete` | POST | Remover um cadastro (`{ "name": "..." }`) |
+| `/api/registration/clear` | POST | Remover todos os cadastros |
 | `/api/action` | POST | Ações: `register`, `validate`, `cancel` |
 
-## Gerando o Executável (Windows)
+---
 
-```bash
-pip install pyinstaller
-pyinstaller app.spec
-```
+## ⚙️ Configurações
 
-O executável será gerado em `dist/app/app.exe`.  
-Use `scripts/servidor_keep_alive.bat` para reinício automático do servidor.
-
-## Configurações
-
-As configurações ficam em `faces_db/settings.json`:
+Ficam em `faces_db/settings.json` e podem ser ajustadas pela interface:
 
 ```json
 {
@@ -89,3 +150,34 @@ As configurações ficam em `faces_db/settings.json`:
   "max_reference_photos_per_person": 15
 }
 ```
+
+| Configuração | Faixa | Descrição |
+|--------------|-------|-----------|
+| `confirmed_score_threshold` | 0.05 – 0.99 | Pontuação mínima para confirmar uma identidade. Quanto maior, mais rigoroso |
+| `samples_needed` | 2 – 20 | Número de amostras coletadas por pessoa no cadastro |
+| `max_reference_photos_per_person` | 1 – 60 | Máximo de fotos de referência guardadas por pessoa |
+
+---
+
+## 🛠️ Gerando o executável (Windows)
+
+```bash
+pip install pyinstaller
+pyinstaller app.spec
+```
+
+O executável é gerado em `dist/app/app.exe`.
+
+Para manter o servidor sempre ativo, use o watchdog que reinicia o app automaticamente caso ele feche:
+
+```bash
+scripts\servidor_keep_alive.bat
+```
+
+---
+
+## 📝 Notas
+
+- Os encodings faciais são **vetores numéricos de 128 dimensões** — o app não armazena imagens dos rostos para identificação, apenas para referência visual.
+- A pasta `faces_db/` contém dados gerados em uso; faça backup dela se quiser preservar os cadastros.
+- Arquivos de runtime (`capture_history.jsonl`, `error.log`), caches e artefatos de build são ignorados pelo Git (ver `.gitignore`).
