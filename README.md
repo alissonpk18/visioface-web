@@ -52,6 +52,44 @@ pip install -r requirements.txt
 
 ---
 
+## 🔐 Segurança e LGPD
+
+Este sistema processa **dados biométricos** (dados pessoais sensíveis) conforme definido pela [Lei nº 13.709/2018 (LGPD)](https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm), Art. 5º, II.
+
+### Configurar senha de acesso (obrigatório em produção)
+
+Defina a variável de ambiente `APP_PASSWORD` antes de iniciar o servidor:
+
+```bash
+# Windows
+set APP_PASSWORD=sua_senha_aqui
+python app.py
+
+# Linux/macOS
+export APP_PASSWORD=sua_senha_aqui
+python app.py
+```
+
+Sem `APP_PASSWORD`, o sistema inicia sem proteção e exibe um aviso no terminal. **Nunca use sem senha em redes compartilhadas ou produção.**
+
+### Retenção de dados
+
+O histórico de avistamentos é purgado automaticamente ao iniciar. O padrão é **90 dias**. Para alterar:
+
+```bash
+export HISTORY_RETENTION_DAYS=30   # manter apenas 30 dias
+```
+
+### Direitos do titular (Art. 18 da LGPD)
+
+| Direito | Como exercer |
+|---------|-------------|
+| Exclusão dos dados | Página **Gerenciar Cadastros** → botão Excluir |
+| Limpar histórico | Tela principal → botão **Apagar Histórico de Vistos** |
+| Limpar todos os cadastros | Gerenciar Cadastros → **Limpar Base** |
+
+---
+
 ## ▶️ Como usar
 
 ```bash

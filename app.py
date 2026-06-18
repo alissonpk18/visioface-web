@@ -15,6 +15,7 @@ import threading
 import traceback
 from dataclasses import dataclass
 from datetime import datetime
+from functools import wraps
 
 import cv2
 import numpy as np
@@ -52,6 +53,13 @@ FOCUS_ZONE_HEIGHT_RATIO = 0.40
 HISTORY_DEDUP_WINDOW_SEC = 2.0
 SIGHTING_MIN_INTERVAL_SEC = 60.0
 
+# LGPD: retenção máxima do histórico (Art. 15 — dados não devem ser mantidos além do necessário)
+HISTORY_RETENTION_DAYS = int(os.environ.get("HISTORY_RETENTION_DAYS", "90"))
+
+# LGPD: senha de acesso obrigatória para proteger dados biométricos (Art. 46)
+# Defina a variável de ambiente APP_PASSWORD antes de iniciar o servidor.
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+
 STATUS_IDLE = "Aguardando rosto na camera"
 STATUS_ANALYZING = "Analisando..."
 STATUS_AMBIGUOUS = "Ambiguidade detectada - use a zona de foco central"
@@ -66,6 +74,23 @@ COLOR_IDLE = (180, 180, 180)
 COLOR_ANALYZING = (0, 255, 255)  # amarelo
 COLOR_OK = (0, 255, 0)  # verde
 COLOR_FAIL = (0, 0, 255)  # vermelho
+
+
+def requires_auth(f):
+    """LGPD Art. 46 — protege o acesso a dados biométricos com senha."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not APP_PASSWORD:
+            return f(*args, **kwargs)
+        auth = request.authorization
+        if not auth or auth.password != APP_PASSWORD:
+            return Response(
+                "Acesso restrito. Defina APP_PASSWORD e informe a senha.",
+                401,
+                {"WWW-Authenticate": 'Basic realm="Face.ID Premium — Acesso Restrito"'},
+            )
+        return f(*args, **kwargs)
+    return decorated
 
 
 def log_error(message: str):
@@ -535,15 +560,13 @@ class HistoryRepository:
                 "focus_zone_active": bool(focus_zone_active),
                 "faces_count": len(results),
                 "people": list(people_signature),
+                # LGPD Art. 6, III (necessidade): coordenadas do rosto omitidas do log.
                 "faces": [
                     {
-                        "face_id": r.face_id,
-                        "location": list(r.location),
                         "name": r.name,
                         "distance": round(r.distance, 4) if r.distance is not None else None,
                         "matched": r.matched,
                         "uncertain": r.uncertain,
-                        "inside_focus_zone": r.inside_focus_zone,
                     }
                     for r in results
                 ],
@@ -631,6 +654,35 @@ class HistoryRepository:
             self.last_sighting_by_person = {}
             self.sightings_cache = []
             self.recent_buffer = {}
+        return removed
+
+    def purge_old_entries(self, retention_days: int):
+        """LGPD Art. 15 — elimina registros mais antigos que retention_days."""
+        if retention_days <= 0:
+            return 0
+        cutoff = datetime.now().timestamp() - retention_days * 86400
+        kept_lines = []
+        removed = 0
+        with self.lock:
+            try:
+                with open(self.file_path, "r", encoding="utf-8") as f:
+                    for raw_line in f:
+                        line = raw_line.strip()
+                        if not line:
+                            continue
+                        try:
+                            payload = json.loads(line)
+                            ts = self._to_epoch(payload.get("timestamp"))
+                            if ts is not None and ts < cutoff:
+                                removed += 1
+                                continue
+                        except Exception:
+                            pass
+                        kept_lines.append(raw_line if raw_line.endswith("\n") else raw_line + "\n")
+                with open(self.file_path, "w", encoding="utf-8") as f:
+                    f.writelines(kept_lines)
+            except Exception:
+                log_error("Falha ao purgar historico antigo.")
         return removed
 
 
@@ -721,6 +773,9 @@ class WebTracker:
         self.samples_needed = SAMPLES_NEEDED
         self.max_reference_photos_per_person = 15
         self._apply_settings(self.settings_repo.get_settings())
+
+        # LGPD Art. 15: purga histórico mais antigo que HISTORY_RETENTION_DAYS dias na inicialização
+        self.history_repo.purge_old_entries(HISTORY_RETENTION_DAYS)
 
         self.camera.start()
         if not self.camera.running:
@@ -1310,11 +1365,13 @@ tracker = WebTracker()
 
 
 @app.route("/")
+@requires_auth
 def index():
     return render_template("index.html")
 
 
 @app.route("/cadastros")
+@requires_auth
 def cadastros():
     return render_template("cadastros.html")
 
@@ -1328,11 +1385,13 @@ def gen_frames():
 
 
 @app.route("/video_feed")
+@requires_auth
 def video_feed():
     return Response(gen_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
 @app.route("/api/status")
+@requires_auth
 def status():
     return jsonify(
         {
@@ -1353,6 +1412,7 @@ def status():
 
 
 @app.route("/api/settings", methods=["GET", "POST"])
+@requires_auth
 def settings():
     if request.method == "GET":
         return jsonify(tracker.get_settings())
@@ -1363,6 +1423,7 @@ def settings():
 
 
 @app.route("/api/history")
+@requires_auth
 def history():
     limit_raw = request.args.get("limit", "30")
     try:
@@ -1373,17 +1434,20 @@ def history():
 
 
 @app.route("/api/history/clear", methods=["POST"])
+@requires_auth
 def clear_history():
     removed = tracker.clear_history_sightings()
     return jsonify({"success": True, "removed": removed})
 
 
 @app.route("/api/registrations")
+@requires_auth
 def registrations():
     return jsonify({"items": tracker.get_registrations_overview()})
 
 
 @app.route("/api/registration/delete", methods=["POST"])
+@requires_auth
 def delete_registration():
     data = request.get_json(silent=True) or {}
     name = data.get("name", "")
@@ -1400,12 +1464,14 @@ def delete_registration():
 
 
 @app.route("/api/registration/clear", methods=["POST"])
+@requires_auth
 def clear_registration():
     removed_samples = tracker.clear_registrations()
     return jsonify({"success": True, "removed_samples": removed_samples})
 
 
 @app.route("/api/action", methods=["POST"])
+@requires_auth
 def action():
     data = request.get_json(silent=True) or {}
     act = data.get("action")
@@ -1422,5 +1488,14 @@ def action():
 
 
 if __name__ == "__main__":
+    if not APP_PASSWORD:
+        print(
+            "\n[AVISO LGPD] A variável de ambiente APP_PASSWORD não está definida.\n"
+            "             O sistema está sem proteção de acesso — qualquer pessoa na rede\n"
+            "             pode visualizar e manipular dados biométricos.\n"
+            "             Defina APP_PASSWORD antes de usar em produção.\n"
+            "             Exemplo: set APP_PASSWORD=sua_senha   (Windows)\n"
+            "                      export APP_PASSWORD=sua_senha (Linux)\n"
+        )
     app.run(host="0.0.0.0", port=5000, debug=False)
 
